@@ -1,0 +1,52 @@
+{
+    "Model_Fitter_Test" : {
+        "input_data_path" :"/local/src/fx_hpx/src/Jul2005-Jul2008.csv",
+        "combined_eval_fitness" : true,
+        "Test_1" : {
+            "Pop_Size" : "3000",
+            "Parameter_Range" : "5.0",
+            "Iterations" : "50",
+            "CR" : ".65",
+            "F" : "0.85",
+            "Fmin" : "0.2",
+            "Fmax" : "1.0",
+            "Fdither" : "false"
+        },
+        "Test_2" : {
+            "Pop_Size" : "100",
+            "Parameter_Range" : "1.0",
+            "Iterations" : "1",
+            "CR" : ".5",
+            "F" : "0.85",
+            "Fmin" : "0.2",
+            "Fmax" : "1.0",
+            "Fdither" : "false"
+        },
+        "Test_3" : {
+            "Pop_Size" : "100",
+            "Parameter_Range" : "1.0",
+            "Iterations" : "10",
+            "CR" : "0.0",
+            "F" : "1.0",
+            "Fmin" : "0.2",
+            "Fmax" : "1.0",
+            "Fdither" : "false"
+        }
+    },
+    "Matrix_Test" : {
+        "Copying" : {
+            "Tiny" : {
+                "Rows" : "2",
+                "Cols" : "3"
+            },
+            "Medium" : {
+                "Rows" : "200",
+                "Cols" : "30"
+            },
+            "Large" : {
+                "Rows" : "2000",
+                "Cols" : "300"
+            }
+        }
+    }
+}
