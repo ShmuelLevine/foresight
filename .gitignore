@@ -1,0 +1,10 @@
+spool
+rates
+log
+rates.squash
+db
+*.mat
+*.csv
+*.out
+*.py
+jobs.dat
