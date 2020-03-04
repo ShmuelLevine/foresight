@@ -4,7 +4,8 @@ log
 rates.squash
 db
 *.mat
-*.csv
+#*.csv
 *.out
 *.py
 jobs.dat
+.ipynb_checkpoints

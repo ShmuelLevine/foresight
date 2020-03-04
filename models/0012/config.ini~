@@ -1,8 +1,8 @@
 fx:user_job_ID="EUR_GBP-15min_0008_LReLU-60lags_50nodes_per_layer"
 fx:user_job_description="EUR-GBP 15min data, F=.9, CR=0.1250, 5-hidden layers (50,50,50,50,50), inputs: lags[0-59], LReLU activation function. Initial range=1.0"
-fx:model:type=Basic_ANN
+fx:model:type="Basic_ANN"
 fx:fitter:output_path=/var/local/foresight/db/default/
-fx:DE:pop_size=2000
+fx:DE:pop_size=1000
 fx:DE:CR=0.125
 fx:DE:F=0.90
 fx:DE:F_min=0.5
