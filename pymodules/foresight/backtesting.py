@@ -1,5 +1,6 @@
 from pandas import Timedelta
-from foresight.model import Model as fx_Model
+import foresight.model
+import foresight.util as fxu
 
 class Backtester:
     """Class used for backtesting models against a timeseries"""
@@ -22,24 +23,16 @@ class Backtester:
                 value of each trade
 
         """
-
-        if model is None or not isinstance(model,fx_Model):
-            raise TypeError('param model: Must be type foresight.model.Model')
+                fxu.ValidateType(model, arg_name='model', reqd_type=foresight.model.Model, err_msg='must be an instance of foresight.model.Model')
         self.model = model
         self.trading_rules = trading_rules
         self.initial_money = initial_money
 
         # Calculate the retraining frequency (in number of datapoints)
         # First ensure that the values provided are of the correct type
-        if type(data_freq) is not Timedelta:
-            print("Invalid data frequency provided. Must be of type pandas.Timedelta")
-            raise TypeError
+                fxu.ValidateType(retraining_freq, arg_name='retraining_freq', reqd_type=Timedelta, err_msg='must be of type pandas.Timedelta')
 
-        if type(retraining_freq) is not Timedelta:
-            print("Invalid retraining frequency provided. Must be of type pandas.Timedelta")
-            raise TypeError
-
-        self.retrain_freq =  retraining_freq / data_freq
+        self.retrain_freq =  retraining_freq / model.data_freq
         print("Restarting every", self.retrain_freq, "datapoints")
         print("New backtester created!!")
 
