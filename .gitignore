@@ -6,7 +6,7 @@ db
 *.mat
 #*.csv
 *.out
-*.py
+models/*/*.py
 jobs.dat
 .ipynb_checkpoints
 __pycache__
