@@ -3,7 +3,6 @@ import foresight.model
 from tensorflow.keras import Sequential as tf_model
 from numpy import ndarray as np_arr
 from pandas import Timedelta as TD
-from collections import Callable
 
 
 class TestModel(unittest.TestCase):
@@ -89,16 +88,16 @@ class TestModel(unittest.TestCase):
                           data_freq=TD('1D'),
                           seq_len=None)
 
-    def test_Model_Raise_if_Arg_seq_len_Is_Model(self):
-        self.assertRaises(TypeError,
-                          foresight.model.Model,
-                          tf_model(),
-                          data=np_arr([0]),
-                          data_freq=TD('1D'),
-                          seq_len=foresight.model.Model(tf_model(),
-                                                        data=np_arr([0]),
-                                                        data_freq=TD('1D'),
-                                                        seq_len=30))
+    # def test_Model_Raise_if_Arg_seq_len_Is_Model(self):
+    #     self.assertRaises(TypeError,
+    #                       foresight.model.Model,
+    #                       tf_model(),
+    #                       data=np_arr([0]),
+    #                       data_freq=TD('1D'),
+    #                       seq_len=foresight.model.Model(tf_model(),
+    #                                                     data=np_arr([0]),
+    #                                                     data_freq=TD('1D'),
+    #                                                     seq_len=30))
 
     def test_Model_Raise_if_Arg_seq_len_Is_Str(self):
         self.assertRaises(TypeError,
@@ -107,6 +106,15 @@ class TestModel(unittest.TestCase):
                           data=np_arr([0]),
                           data_freq=TD('1D'),
                           seq_len='30')
+
+    def test_Model_Raise_if_Arg_transform_not_function_object(self):
+        self.assertRaises(TypeError,
+                          foresight.model.Model,
+                          tf_model(),
+                          data=np_arr([0]),
+                          data_freq=TD('1D'),
+                          seq_len=30,
+                          data_transform=30)
 
 
 if __name__ == '__main__':

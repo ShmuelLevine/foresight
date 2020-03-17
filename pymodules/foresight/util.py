@@ -8,8 +8,24 @@ def fullname(o):
     return module + '.' + o.__class__.__name__
 
 
-def ValidateType(obj, reqd_type, err_msg='', arg_name='', allow_none=False):
+def ValidateType(obj,
+                 reqd_type=None,
+                 val_func=None,
+                 err_msg='',
+                 arg_name='',
+                 allow_none=False):
     if not allow_none:
         if (obj is None): raise TypeError(arg_name + ' cannot be None')
-    if (not isinstance(obj, reqd_type)):
-        raise TypeError(arg_name + ' ' + err_msg)
+
+    # User cannot supply both a type name and a validation function
+    assert ((reqd_type is None) or (val_func is None))
+    assert (not ((reqd_type is None) and (val_func is None)))
+
+    if obj is not None:
+        if reqd_type is not None:
+            if (not isinstance(obj, reqd_type)):
+                raise TypeError(arg_name + ' ' + err_msg)
+
+            else:
+                if (not val_func(obj)):
+                    raise TypeError(arg_name + ' ' + err_msg)

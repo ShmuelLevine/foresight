@@ -10,3 +10,10 @@ models/*/*.py
 jobs.dat
 .ipynb_checkpoints
 __pycache__
+/.projectile
+/pymodules/foresight/Makefile
+/pymodules/foresight/docs/
+*.py#
+/pymodules/foresight/#Makefile#
+/pymodules/foresight/make.bat
+/pymodules/foresight/source/
