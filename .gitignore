@@ -16,4 +16,4 @@ __pycache__
 *.py#
 /pymodules/foresight/#Makefile#
 /pymodules/foresight/make.bat
-/pymodules/foresight/source/
+#/pymodules/foresight/source/
