@@ -4,29 +4,33 @@ import foresight.util as fxu
 
 
 class Backtester:
-    """Class used for backtesting models against a timeseries"""
+    """
+    Class used for backtesting models against a timeseries
+
+    :param model: The fitted Keras Model to be backtested
+    :type model: class:`keras.Model`
+    
+    :param trading_rules: A set of rules used to determine when to make trades
+    :type trading_rules: class:`Trading_Rules`
+
+    :param retraining_frequency: A pandas.Timedelta object denoting how
+                frequently to refit the model.  NOTE: at this time, the retraining will
+                not be 100% exact.
+    :type retraining_frequency: class:`pandas.Timedelta`
+
+    :param initial_money: An integer representing the amount of money initially used
+                for trading. This amount is used by the trading rules in establishing the
+                value of each trade
+    :type initial_money: int
+  
+    """
+
     def __init__(self,
                  model,
                  trading_rules,
                  retraining_freq,
                  initial_money=10_000):
-        """Initialize a Backtester instance
 
-        Args:
-            model (keras.Model) -- The fitted Keras Model to be backtested
-
-            trading_rules -- A subclass of Trading_Rules which contains rules used to
-               determine when to make trades
-
-            retraining_frequency (pandas.Timedelta) -- A pandas.Timedelta object denoting how
-                frequently to refit the model.  NOTE: at this time, the retraining will
-                not be 100% exact.
-
-            initial_money -- An integer representing the amount of money initially used
-                for trading. This amount is used by the trading rules in establishing the
-                value of each trade
-
-        """
         fxu.ValidateType(
             model,
             arg_name='model',
