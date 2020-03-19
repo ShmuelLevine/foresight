@@ -31,3 +31,6 @@ def ValidateType(obj,
         else:
             if (not val_func(obj)):
                 raise TypeError(arg_name + ' ' + err_msg)
+
+def round_down(x, base=5):
+    return base * (round(x/base) - 1)

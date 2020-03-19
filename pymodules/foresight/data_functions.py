@@ -1,5 +1,8 @@
 # data_functions.py
 
+import pandas as pd
+import numpy as np
+
 
 def series_to_supervised(data,
                          n_in=1,
@@ -54,7 +57,7 @@ def series_to_supervised(data,
         for col in outnames:
             out[col] = agg[col]
             del agg[col]
-        return agg, out
+        return agg.to_numpy(), out.to_numpy()
     return agg
 
 
