@@ -8,6 +8,7 @@ from pandas import Timedelta as TD
 from collections.abc import Callable
 import foresight.util as fxu
 import string
+import foresight.data_functions as fx_df
 
 
 class Model:
@@ -38,12 +39,16 @@ class Model:
         must be a tuple of :class:`numpy.ndarray` and a :class:`pandas.MinMaxScaler` or `None`
     :type data_transform: class:`collections.abc.Callable`
 
+    :param forecast_horizon: The number of timesteps to forecast for each input sequence
+    :type forecast_horizon: int
+
     """
     def __init__(self,
                  model,
                  data,
                  data_freq,
                  seq_len,
+                 forecast_horizon=1,
                  data_transform=None,
                  stationary_transform=None):
 
@@ -82,16 +87,72 @@ class Model:
 
         # We need to store the entire transformed data to use with the model, but only enough
         # raw data to generate the next sequence when a new datum is added
-        self.model = model
-        self.rawdata = data[-seq_len:]  # store the last seq_len points
-        self.data_freq = data_freq
-        self.data_transform = data_transform
-        self.data, self.scaler = self.data_transform(
-            data)  # store the transformed data
-        self.seq_len = seq_len
+        self._model = model
+        self._rawdata = data[-seq_len:]  # store the last seq_len points
+        self._data_freq = data_freq
+        self._data_transform = data_transform
+        self._seq_len = seq_len
 
-    def Fit(self, batch_size=128, epochs=2000):
-        pass
+        assert (forecast_horizon == 1,
+                'Code cannot handle forecast horizon other than 1 right now')
+
+        # store the transformed data in an intermediate variable, as the data needs to be converted
+        # into supervised learning data
+        data_inter, self._scaler = self.data_transform(data)
+
+        # convert the input data into 2 matrices representing inputs and expected outputs, to use for
+        # model training
+        self._in_data, self._out_data = fx_df.series_to_supervised(
+            data=data_inter,
+            n_in=self._seq_len,
+            n_out=forecast_horizon,
+            separate_output_series=True)
+
+        # reshape the data to ensure it is appropriate for keras
+        # inputs need to be of the dimensions (samples, sequence, features)
+        self.in_data = self.in_data.reshape(
+            (self.in_data.shape[0], self.seq_len, 1))
+        self.out_data = self.out_data.reshape((-1, forecast_horizon))
+
+    def Fit(self,
+            batch_size=128,
+            epochs=2000,
+            train_frac=0.8,
+            valid_frac=1 / 3,
+            verbose=False,
+            validate_model=True,
+            print_test_stat=True):
+        """ Fit the specified model to the data
+
+
+        """
+        n_train = fxu.round_down(0.8 * self.in_data.shape[0], base=1)
+        n_valid = fxu.round_down(1 * (self.in_data.shape[0] - n_train) / 3,
+                                 base=1)
+        in_train = self.in_data[:n_train]
+        in_test = self.in_data[n_train:-n_valid]
+        in_valid = self.in_data[-n_valid:]
+        out_train = self.out_data[:n_train]
+        out_test = self.out_data[n_train:-n_valid]
+        out_valid = self.out_data[-n_valid:]
+
+        if verbose:
+            print('Number of training samples: ', n_train)
+            print('Number of test samples: ', in_test.shape[0])
+            print('Number of validation samples: ', in_valid.shape[0])
+
+            history = self._model.fit(in_train,
+                                      out_train,
+                                      batch_size=batch_size,
+                                      epochs=epochs,
+                                      verbose=verbose)
+        if print_test_stat:
+            loss = self._model.evaluate(in_test, out_test, verbose=1)
+
+        if validate_model:
+            yhat = self._model.predict(in_valid, verbose=0)
+
+        return history, loss, yhat
 
     def AddDatum(self, datum):
         if (datum is None) or (not isinstance(datum, float)):
