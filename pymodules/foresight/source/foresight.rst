@@ -12,6 +12,14 @@ foresight.backtesting module
     :undoc-members:
     :show-inheritance:
 
+foresight.data\_functions module
+--------------------------------
+
+.. automodule:: foresight.data_functions
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 foresight.model module
 ----------------------
 
