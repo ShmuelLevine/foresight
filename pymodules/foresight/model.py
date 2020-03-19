@@ -7,6 +7,7 @@ import pandas
 from pandas import Timedelta as TD
 from collections.abc import Callable
 import foresight.util as fxu
+import string
 
 
 class Model:
@@ -19,7 +20,9 @@ class Model:
     :type model: class:`tensorflow.keras.Model`
 
     :param data: A handle to a :class:`numpy.ndarray` containing the data for the model.
-        The data should include fields for datetime, bid, and ask prices
+        The data should either be a 1D array containing just the bid prices or a multi-dim array
+        otherwise including fields for datetime, bid, and (optionally) ask prices. If the array
+        is 1D, it will be assumed that the data has already been properly sampled
     :type data: class:`numpy.ndarray`
 
     :param data_freq: A :class:`pandas.Datetime` object denoting the frequency to use for
@@ -31,11 +34,18 @@ class Model:
 
     :param data_transform: A function object that contains the necessary transformations
         to perform on the data before using it in the model.  The same transformations will be
-        used for additional data (used for backtesting and trading)
+        used for additional data (used for backtesting and trading).  The return type of this function
+        must be a tuple of :class:`numpy.ndarray` and a :class:`pandas.MinMaxScaler` or `None`
     :type data_transform: class:`collections.abc.Callable`
 
     """
-    def __init__(self, model, data, data_freq, seq_len, data_transform=None):
+    def __init__(self,
+                 model,
+                 data,
+                 data_freq,
+                 seq_len,
+                 data_transform=None,
+                 stationary_transform=None):
 
         fxu.ValidateType(
             model,
@@ -64,10 +74,20 @@ class Model:
                          err_msg='must be a callable type',
                          allow_none=True)
 
+        fxu.ValidateType(stationary_transform,
+                         reqd_type=str,
+                         arg_name='stationary_transform',
+                         err_msg='must [None, \'Diff\', \'LogDiff\']',
+                         allow_none=True)
+
+        # We need to store the entire transformed data to use with the model, but only enough
+        # raw data to generate the next sequence when a new datum is added
         self.model = model
-        self.data = data
+        self.rawdata = data[-seq_len:]  # store the last seq_len points
         self.data_freq = data_freq
         self.data_transform = data_transform
+        self.data, self.scaler = self.data_transform(
+            data)  # store the transformed data
         self.seq_len = seq_len
 
     def Fit(self, batch_size=128, epochs=2000):

@@ -116,11 +116,20 @@ class TestModel(unittest.TestCase):
                           seq_len=30,
                           data_transform=30)
 
+    def test_Model_No_Raise_if_Arg_transform_not_function_object(self):
+        m = foresight.model.Model(tf_model(),
+                                  data=np_arr([0]),
+                                  data_freq=TD('1D'),
+                                  seq_len=30,
+                                  data_transform=lambda x: (x, x),
+                                  stationary_transform='LogDiff')
+        self.assertTrue(m is not None)
+
 
 if __name__ == '__main__':
     unittest.main()
 """
-    
+
 
 try:
     print('transform not function object')

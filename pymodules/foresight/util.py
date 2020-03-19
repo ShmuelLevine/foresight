@@ -18,7 +18,9 @@ def ValidateType(obj,
         if (obj is None): raise TypeError(arg_name + ' cannot be None')
 
     # User cannot supply both a type name and a validation function
-    assert ((reqd_type is None) or (val_func is None))
+    # assert: only 1 can have the value
+    assert (((reqd_type is None) and (val_func is not None))
+            or ((reqd_type is not None) and (val_func is None)))
     assert (not ((reqd_type is None) and (val_func is None)))
 
     if obj is not None:
@@ -26,6 +28,6 @@ def ValidateType(obj,
             if (not isinstance(obj, reqd_type)):
                 raise TypeError(arg_name + ' ' + err_msg)
 
-            else:
-                if (not val_func(obj)):
-                    raise TypeError(arg_name + ' ' + err_msg)
+        else:
+            if (not val_func(obj)):
+                raise TypeError(arg_name + ' ' + err_msg)
