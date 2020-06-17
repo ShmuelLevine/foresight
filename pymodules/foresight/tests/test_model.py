@@ -2,6 +2,7 @@ import unittest
 import foresight.model
 from tensorflow.keras import Sequential as tf_model
 from numpy import ndarray as np_arr
+import numpy as np
 from pandas import Timedelta as TD
 
 
@@ -12,7 +13,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           model=None,
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len=30)
 
@@ -20,7 +21,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           5,
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len=30)
 
@@ -28,7 +29,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           'foresight.model.Model',
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len=30)
 
@@ -60,7 +61,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=None,
                           seq_len=30)
 
@@ -68,7 +69,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=1,
                           seq_len=30)
 
@@ -76,7 +77,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq='1D',
                           seq_len=30)
 
@@ -84,7 +85,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len=None)
 
@@ -103,7 +104,7 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len='30')
 
@@ -111,14 +112,14 @@ class TestModel(unittest.TestCase):
         self.assertRaises(TypeError,
                           foresight.model.Model,
                           tf_model(),
-                          data=np_arr([0]),
+                          data=np.arange(30),
                           data_freq=TD('1D'),
                           seq_len=30,
                           data_transform=30)
 
     def test_Model_No_Raise_if_Arg_transform_not_function_object(self):
         m = foresight.model.Model(tf_model(),
-                                  data=np_arr([0]),
+                                  data=np.arange(30),
                                   data_freq=TD('1D'),
                                   seq_len=30,
                                   data_transform=lambda x: (x, x),

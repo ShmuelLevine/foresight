@@ -34,3 +34,9 @@ def ValidateType(obj,
 
 def round_down(x, base=5):
     return base * (round(x/base) - 1)
+
+def VarExists(x):
+    try: x
+    except NameError:
+        return False
+    return True

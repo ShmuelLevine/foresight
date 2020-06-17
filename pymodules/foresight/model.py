@@ -1,8 +1,8 @@
 # model.py
 
 from tensorflow.keras import Model as tf_model
-import numpy
-import pandas
+import numpy as np
+import pandas as pd
 #from numpy import array as np_array
 from pandas import Timedelta as TD
 from collections.abc import Callable
@@ -48,9 +48,11 @@ class Model:
                  data,
                  data_freq,
                  seq_len,
+                 scaler=None,
                  forecast_horizon=1,
                  data_transform=None,
-                 stationary_transform=None):
+                 stationary_transform=None,
+                 max_training_data_factor=3):
 
         fxu.ValidateType(
             model,
@@ -88,17 +90,19 @@ class Model:
         # We need to store the entire transformed data to use with the model, but only enough
         # raw data to generate the next sequence when a new datum is added
         self._model = model
-        self._rawdata = data[-seq_len:]  # store the last seq_len points
+#       self._rawdata = data[-seq_len:]  # store the last seq_len points
         self._data_freq = data_freq
         self._data_transform = data_transform
         self._seq_len = seq_len
+        self._forecast_horizon = forecast_horizon
+        self._max_training_data_factor = max_training_data_factor
 
         assert (forecast_horizon == 1,
                 'Code cannot handle forecast horizon other than 1 right now')
 
         # store the transformed data in an intermediate variable, as the data needs to be converted
         # into supervised learning data
-        data_inter, self._scaler = self.data_transform(data)
+        data_inter, self._scaler = numpy.array(self._data_transform(data))
 
         # convert the input data into 2 matrices representing inputs and expected outputs, to use for
         # model training
@@ -110,10 +114,120 @@ class Model:
 
         # reshape the data to ensure it is appropriate for keras
         # inputs need to be of the dimensions (samples, sequence, features)
-        self.in_data = self.in_data.reshape(
-            (self.in_data.shape[0], self.seq_len, 1))
-        self.out_data = self.out_data.reshape((-1, forecast_horizon))
+        self._in_data = self._in_data.reshape(
+            (self._in_data.shape[0], self._seq_len, 1))
+        self._out_data = self._out_data.reshape((-1, forecast_horizon))
+        
+        self._max_training_samples = max_training_data_factor * self._in_data.shape[0]
+        self.__oldest_datum = 0
 
+        
+    def _ReplaceTrainingData(self, input_seq, output_seq):
+        """
+        Function to add a new datum to the training/inference data, by replacing the oldest sequence
+
+        This function encapsulates the logic and index required to add a new datum and remove the oldest.
+        By doing so, it treats the member self._in_data and self._out_data as circular buffers, since the
+        training process is not sensitive to the order of the sequences.
+
+        The assumed use of this function is during backtesting.  During this process, a new datum is read from
+        the actual data; a new sequence of data is generated and the model is run with this single sequence to 
+        predict the next datum.  As such, it should also be necessary to append data to the outputs; however, 
+        by nature, this index is lagged by 1 compared to the input data.
+
+        To handle this, the initial index is set for None, as a sentinel value.  
+
+        :param input_seq: A numpy array containing the new input sequences for the model
+        :type datum: class:`numpy.ndarray`
+
+        :param input_seq: A numpy array containing the new output values (sequences) for the model
+        :type datum: class:`numpy.ndarray`
+
+        """
+
+        if (input_seq is None) or (not isinstance(input_seq, np.ndarray)):
+            raise TypeError('input_seq must be a numpy array type')
+        if (output_seq is None) or (not isinstance(output_seq, np.ndarray)):
+            raise TypeError('output_seq must be a numpy array type')
+
+        num_samples = self._in_data.shape[0]
+        
+        # reshape the new data into 3D array of samples, sequence, features
+        input_seq = input_seq.reshape((input_seq.shape[0], input_seq.shape[1], -1))
+        output_seq = output_seq.reshape( (-1,  self._forecast_horizon)) 
+        
+        new_samples = input_seq.shape[0]
+        
+        if new_samples > num_samples:
+            self._in_data = input_seq[-num_samples:]
+            self._out_data = output_seq[-num_samples:]
+        else:
+            indices = np.arange(self.__oldest_datum, new_samples + self.__oldest_datum) % num_samples
+            for i_src, i_tgt in enumerate(indices):
+                self._in_data[i_tgt] = input_seq[i_src]
+                self._out_data[i_tgt] = output_seq[i_src]
+            self.__oldest_datum = (self.__oldest_datum + new_samples) % num_samples
+
+    def _AppendTrainingData(self, input_seq, output_seq):
+        """
+        Function to add a new datum to the training/inference data, by replacing the oldest sequence
+
+        This function encapsulates the logic and index required to add a new datum and remove the oldest.
+        By doing so, it treats the member self._in_data and self._out_data as circular buffers, since the
+        training process is not sensitive to the order of the sequences.
+
+        The assumed use of this function is during backtesting.  During this process, a new datum is read from
+        the actual data; a new sequence of data is generated and the model is run with this single sequence to 
+        predict the next datum.  As such, it should also be necessary to append data to the outputs; however, 
+        by nature, this index is lagged by 1 compared to the input data.
+
+        To handle this, the initial index is set for None, as a sentinel value.  
+
+        :param input_seq: A numpy array containing the new input sequences for the model
+        :type datum: class:`numpy.ndarray`
+
+        :param input_seq: A numpy array containing the new output values (sequences) for the model
+        :type datum: class:`numpy.ndarray`
+
+        """
+
+        if (input_seq is None) or (not isinstance(input_seq, np.ndarray)):
+            raise TypeError('input_seq must be a numpy array type')
+        if (output_seq is None) or (not isinstance(output_seq, np.ndarray)):
+            raise TypeError('output_seq must be a numpy array type')
+
+        num_samples = self._in_data.shape[0]
+        
+        # reshape the new data into 3D array of samples, sequence, features
+        input_seq = input_seq.reshape((input_seq.shape[0], input_seq.shape[1], -1))
+        output_seq = output_seq.reshape( (-1,  self._forecast_horizon)) 
+        
+        new_samples = input_seq.shape[0]
+        
+        self._in_data = np.concatenate((self._in_data, input_seq))
+        self._out_data = np.concatenate((self._out_data, output_seq))
+        
+    def AddTrainingData(self, input_seq, output_seq):
+        """
+        Function to add new training data to the training data, by conditionally appending or replacing existing data, based on self._max_training_data_factor
+
+        The assumed use of this function is during backtesting.  
+
+        :param input_seq: A numpy array containing the new input sequences for the model
+        :type datum: class:`numpy.ndarray`
+
+        :param input_seq: A numpy array containing the new output values (sequences) for the model
+        :type datum: class:`numpy.ndarray`
+
+        """
+
+        existing_samples = self._in_data.shape[0]
+        if existing_samples < self._max_training_samples:
+            self._AppendTrainingData(input_seq, output_seq)
+        else:
+            self._ReplaceTrainingData(input_seq, output_seq)
+            
+            
     def Fit(self,
             batch_size=128,
             epochs=2000,
@@ -122,20 +236,46 @@ class Model:
             verbose=False,
             validate_model=True,
             print_test_stat=True):
+        
         """ Fit the specified model to the data
 
+            :param batch_size: Batch size used for keras.model.fit() function
+            :type batch_size: int
+
+            :param epochs: Number of epochs to use for training the data
+            :type epochs: int
+
+            :param train_frac: Fraction of the dataset to use for training the model
+            :type train_frac: float
+
+            :param valid_frac: Fraction of the dataset remaining after removing the training data to use for validating the model. 
+            :type valid_frac: float
+
+            :param verbose: Boolean value denoting whether to provide fitting details (passed through to keras.model.fit() function)
+            :type verbose: bool
+
+            :param validate_model: Boolean value denoting whether to validate the model after fitting
+            :type validate_model: bool
+
+            :param print_test_stat
+            :type print_test_stat
 
         """
-        n_train = fxu.round_down(0.8 * self.in_data.shape[0], base=1)
-        n_valid = fxu.round_down(1 * (self.in_data.shape[0] - n_train) / 3,
+        
+        n_train = fxu.round_down(0.8 * self._in_data.shape[0], base=1)
+        n_valid = fxu.round_down(1 * (self._in_data.shape[0] - n_train) / 3,
                                  base=1)
-        in_train = self.in_data[:n_train]
-        in_test = self.in_data[n_train:-n_valid]
-        in_valid = self.in_data[-n_valid:]
-        out_train = self.out_data[:n_train]
-        out_test = self.out_data[n_train:-n_valid]
-        out_valid = self.out_data[-n_valid:]
+        in_train = self._in_data[:n_train]
+        in_test = self._in_data[n_train:-n_valid]
+        in_valid = self._in_data[-n_valid:]
+        out_train = self._out_data[:n_train]
+        out_test = self._out_data[n_train:-n_valid]
+        out_valid = self._out_data[-n_valid:]
 
+        # Ensure that the model has been compiled.  If not, compile it now
+        if not self._model._is_compiled:
+            self._model.compile(loss= 'mae' , optimizer= 'nadam' )
+            
         if verbose:
             print('Number of training samples: ', n_train)
             print('Number of test samples: ', in_test.shape[0])
@@ -154,6 +294,5 @@ class Model:
 
         return history, loss, yhat
 
-    def AddDatum(self, datum):
-        if (datum is None) or (not isinstance(datum, float)):
-            raise TypeError('datum must be a float type')
+    def Forecast(self, inputs):
+        return self._model.predict(inputs.reshape( (inputs.shape[0], -1, 1)))
