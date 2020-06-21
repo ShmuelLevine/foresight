@@ -1,7 +1,12 @@
 # model.py
 
+import tensorflow as tf
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
+
 from tensorflow.keras import Model as tf_model
 import numpy as np
+import numpy
 import pandas as pd
 #from numpy import array as np_array
 from pandas import Timedelta as TD
@@ -62,7 +67,7 @@ class Model:
 
         fxu.ValidateType(data,
                          arg_name='data',
-                         reqd_type=numpy.ndarray,
+                         reqd_type=np.ndarray,
                          err_msg='must be an instance of numpy.array')
 
         fxu.ValidateType(data_freq,
@@ -118,7 +123,7 @@ class Model:
             (self._in_data.shape[0], self._seq_len, 1))
         self._out_data = self._out_data.reshape((-1, forecast_horizon))
         
-        self._max_training_samples = max_training_data_factor * self._in_data.shape[0]
+        self._max_training_samples = int(max_training_data_factor * self._in_data.shape[0])
         self.__oldest_datum = 0
 
         
@@ -261,9 +266,10 @@ class Model:
             :type print_test_stat
 
         """
+        self._batch_size = batch_size
         
-        n_train = fxu.round_down(0.8 * self._in_data.shape[0], base=1)
-        n_valid = fxu.round_down(1 * (self._in_data.shape[0] - n_train) / 3,
+        n_train = fxu.round_down(train_frac * self._in_data.shape[0], base=1)
+        n_valid = fxu.round_down(valid_frac * (self._in_data.shape[0] - n_train),
                                  base=1)
         in_train = self._in_data[:n_train]
         in_test = self._in_data[n_train:-n_valid]
@@ -275,17 +281,23 @@ class Model:
         # Ensure that the model has been compiled.  If not, compile it now
         if not self._model._is_compiled:
             self._model.compile(loss= 'mae' , optimizer= 'nadam' )
-            
+
+        # Define return variables
+        history = None
+        loss = None
+        yhat = None
+
         if verbose:
             print('Number of training samples: ', n_train)
             print('Number of test samples: ', in_test.shape[0])
             print('Number of validation samples: ', in_valid.shape[0])
 
-            history = self._model.fit(in_train,
-                                      out_train,
-                                      batch_size=batch_size,
-                                      epochs=epochs,
-                                      verbose=verbose)
+        history = self._model.fit(in_train,
+                                  out_train,
+                                  batch_size=batch_size,
+                                  epochs=epochs,
+                                  verbose=verbose)
+        
         if print_test_stat:
             loss = self._model.evaluate(in_test, out_test, verbose=1)
 
@@ -296,3 +308,12 @@ class Model:
 
     def Forecast(self, inputs):
         return self._model.predict(inputs.reshape( (inputs.shape[0], -1, 1)))
+    
+    def Refit(self, epochs = 50, verbose = True):
+        return self.Fit(batch_size=self._batch_size,
+            epochs=epochs,
+            train_frac=1,
+            valid_frac=0,
+            verbose=verbose,
+            validate_model=False,
+            print_test_stat=False)
