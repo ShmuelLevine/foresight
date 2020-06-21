@@ -30,7 +30,7 @@ class Backtester:
     def __init__(self,
                  model,
                  retraining_freq,
-                 trading_rules = {'trade_size' : 1_000_000, 'stop_loss' : 0.00025, 'take_profit' : 0.00025, 'min_change' : 0.00005 },
+                 trading_rules = {'trade_size' : 250_000, 'stop_loss' : 0.00025, 'take_profit' : 0.00025, 'min_change' : 0.00005, 'leverage' : 1 },
                  initial_money=10_000):
 
 #        fxu.ValidateType(
@@ -82,8 +82,59 @@ class Backtester:
 #        # remove the weekends when there is no trading
 #        _data = df2d[df2d.index.dayofweek < 5]
 
+    def OpenPosition(self, position_type = None, price = None):
+        if position_type == 'long':
+            self._account['position'] += self._trading_rules['trade_size']
+            self._account['balance'] -= self._trading_rules['trade_size'] * price # open long - use bid price
+            self._account['txn_price'] = price
+            print('index: ', idx, ' open long position. balance: ', self._account['balance'])
+        elif position_type == 'short': 
+            self._account['position'] -= self._trading_rules['trade_size']
+            self._account['balance'] -= self._trading_rules['trade_size'] * price # open short - use ask price
+            self._account['txn_price'] = price
+            print('index: ', idx, ' open short position. balance: ', self._account['balance'])
+        else:
+            raise ValueError('position_type must be either \'long\' or \'short\'')
 
-    def Backtest(self, data, verbose=False, initial_retraining = 0.15):
+    def ClosePosition(self, position_type = None, price = None):
+        if position_type == 'long':
+            self._account['position'] += self._trading_rules['trade_size']
+            self._account['balance'] -= self._trading_rules['trade_size'] * price # open long - use bid price
+            self._account['txn_price'] = price
+            print('index: ', idx, ' open long position. balance: ', self._account['balance'])
+        elif position_type == 'short': 
+            self._account['position'] -= self._trading_rules['trade_size']
+            self._account['balance'] -= self._trading_rules['trade_size'] * price # open short - use ask price
+            self._account['txn_price'] = price
+            print('index: ', idx, ' open short position. balance: ', self._account['balance'])
+        else:
+            raise ValueError('position_type must be either \'long\' or \'short\'')
+
+
+    def HasOpenLongPositions(self):
+        return self._account['position'] > 0
+    def HasOpenShortPositions(self):
+        return self._account['position'] < 0
+    def HasNoOpenPositions(self):
+        return self._account['position'] == 0
+    
+    def HasPriceHitTakeProfit(self, price):
+        if self.HasOpenLongPositions():
+            return price >= (self._account['txn_price'] + self._trading_rules['take_profit'])
+        else:
+            return price <= (self._account['txn_price'] - self._trading_rules['take_profit'])
+        pass
+            
+    def HasPriceHitStopLoss(self, price):
+        if self.HasOpenLongPositions():
+            return price < (self._account['txn_price'] - self._trading_rules['stop_loss'])
+        else:
+            return price > (self._account['txn_price'] - self._trading_rules['stop_loss'])
+        pass
+            
+            
+            
+    def Backtest(self, data, verbose=False, initial_retraining = 0.15, retrain_epochs = 25, retrain_verbose = False):
         """
         Backtest the model using the provided data
         
@@ -128,6 +179,7 @@ class Backtester:
         if initial_retraining:
             cur_idx = int(initial_retraining * self.retrain_freq)
             self._model.AddTrainingData(_ins[:cur_idx], _outs[:cur_idx])
+            self._model.Refit(epochs = retrain_epochs, verbose = retrain_verbose)
         
         total_data = _ins.shape[0]
         
@@ -139,6 +191,7 @@ class Backtester:
         # Use data from indices 
         for start_idx in retrain_idx:
             last_idx = start_idx + self.retrain_freq -1 if start_idx + self.retrain_freq -1 <= total_data else total_data
+            print('Main backtesting loop - from indices: ', start_idx, ' to ', last_idx)
             y_hat = self._model.Forecast(_ins[start_idx:last_idx]).flatten()
             print('y_hat.shape', y_hat.shape)
          #   print(type(self._data.iloc[start_idx + idx_offset : last_idx + idx_offset]['bid']))
@@ -162,43 +215,58 @@ class Backtester:
                     # If the forecasted change is greater than the min_change
                     if math.fabs(fore_bid - cur_data['bid'].item()) >= self._trading_rules['min_change']:
                         if fore_bid > cur_data['bid']: # forecast price increase - open long position
-                            self._account['position'] += self._trading_rules['trade_size']
-                            self._account['balance'] -= self._trading_rules['trade_size'] * cur_data['bid'] # open long - use bid price
-                            self._account['txn_price'] = cur_data['bid']
+                            self.OpenPosition(position_type = 'long', price =  cur_data['bid'])
+                            #self._account['position'] += self._trading_rules['trade_size']
+                            #self._account['balance'] -= self._trading_rules['trade_size'] * cur_data['bid'] # open long - use bid price
+                            #self._account['txn_price'] = cur_data['bid']
+                            #print('index: ', idx, ' open long position. balance: ', self._account['balance'])
                         else: # forecast price decrease - open short position
-                            self._account['position'] -= self._trading_rules['trade_size']
-                            self._account['balance'] -= self._trading_rules['trade_size'] * cur_data['ask'] # open short - use ask price
-                            self._account['txn_price'] = cur_data['ask']
+                            self.OpenPosition(position_type = 'short', price =  cur_data['ask'])
+#                            self._account['position'] -= self._trading_rules['trade_size']
+#                            self._account['balance'] -= self._trading_rules['trade_size'] * cur_data['ask'] # open short - use ask price
+#                            self._account['txn_price'] = cur_data['ask']
+#                            print('index: ', idx, ' open short position. balance: ', self._account['balance'])
                             
                 # 2 - Existing long position
                 elif self._account['position'] > 0:
-                    # if hit take_profit, close
-                    if cur_data['ask'] >= self._account['txn_price'] + self._trading_rules['take_profit']: # hit the take_profit point
+                    # if hit take_profit or hit the stop loss, close
+#                    if (cur_data['ask'] >= self._account['txn_price'] + self._trading_rules['take_profit']) or (cur_data['ask'] < self._account['txn_price'] - self._trading_rules['stop_loss']):  
+                    if self.HasPriceHitTakeProfit(cur_data['ask']) or self.HasPriceHitStopLoss(cur_data['ask']):
                         # close the the position
-                        self._account['position'] -= self._trading_rules['trade_size']
-                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['ask'] # close long - use ask price
-                        continue
+                        self.ClosePosition(position_type = 'long', price =  cur_data['ask'])
+#                        self._account['position'] -= self._trading_rules['trade_size']
+#                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['ask'] # close long - use ask price
+#                        print('index: ', idx, ' close long position. balance: ', self._account['balance'])
+                        #continue
                     # if hit stop_loss
-                    if cur_data['ask'] < self._account['txn_price'] - self._trading_rules['stop_loss']: # hit the stop loss
-                        self._account['position'] -= self._trading_rules['trade_size']
-                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['ask'] # close long - use ask price
-                        continue
+#                    if cur_data['ask'] < self._account['txn_price'] - self._trading_rules['stop_loss']: # hit the stop loss
+#                        self._account['position'] -= self._trading_rules['trade_size']
+#                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['ask'] # close long - use ask price
+#                        print('index: ', idx, ' close long position. balance: ', self._account['balance'])
+#                        #continue
                 
                 # 3 - Existing short position
                 elif self._account['position'] < 0:
-                    # if hit take_profit, close
-                    if cur_data['bid'] < self._account['txn_price'] - self._trading_rules['take_profit']: # hit the take_profit point
+                    # if hit take_profit or hit stop_loss, close
+                    if self.HasPriceHitTakeProfit(cur_data['bid']) or self.HasPriceHitStopLoss(cur_data['bid']):
+#                    if (cur_data['bid'] < self._account['txn_price'] - self._trading_rules['take_profit']) or (cur_data['bid'] >= self._account['txn_price'] + self._trading_rules['stop_loss']):
                         # close the the position
-                        self._account['position'] += self._trading_rules['trade_size']
-                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['bid'] # close short - use bid price
-                        continue
+                        self.ClosePosition(position_type = 'short', price =  cur_data['bid'])
+#                        self._account['position'] += self._trading_rules['trade_size']
+#                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['bid'] # close short - use bid price
+#                        print('index: ', idx, ' close short position. balance: ', self._account['balance'])
+#                        #continue
                     # if hit stop_loss
-                    if cur_data['bid'] >= self._account['txn_price'] + self._trading_rules['stop_loss']: # hit the stop loss
-                        self._account['position'] += self._trading_rules['trade_size']
-                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['bid'] # close short - use bid price
-                        continue
+#                    if cur_data['bid'] >= self._account['txn_price'] + self._trading_rules['stop_loss']: # hit the stop loss
+#                        self._account['position'] += self._trading_rules['trade_size']
+#                        self._account['balance'] += self._trading_rules['trade_size'] * cur_data['bid'] # close short - use bid price
+#                        print('index: ', idx, ' close short position. balance: ', self._account['balance'])
+#                        #continue
+                
+                forecast_idx += 1
             
             # Retrain the model
+            print('Retraining model')
             self._model.AddTrainingData(_ins[start_idx:last_idx], _outs[start_idx:last_idx])
-            
+            self._model.Refit(epochs = retrain_epochs, verbose = retrain_verbose)
         print (self._account['balance'])
