@@ -5,6 +5,8 @@ import numpy as np
 import foresight.util as fxu
 import sklearn.preprocessing as skpp
 
+import os
+
 def series_to_supervised(data,
                          n_in=1,
                          n_out=1,
@@ -212,3 +214,38 @@ class Data_Transformer():
         return data_, scaler_
     
     
+def GetTickdataDataframe(src, date_format_string = '%Y-%m-%d %H:%M:%S.%f'):
+    """
+    Convenience function to load a dataset of tick data from a csv file or from pickled data
+    
+    This function loads tick data from file saved on disk.  The pathname should be the base name of the data file - 
+    since this function will automatically check whether a compressed or pickled version of the data file exists.
+    For example: if the src path is /var/local/data/XXXXXX_Data.csv, the code will first check if there is a file
+    var/local/data/XXXXXX_Data.csv containing pickled data.  If not, it will load the data from the csv file.  In doing
+    so, it will check for the existence of var/local/data/XXXXXX_Data.csv.xz; if that exists, it will use that file; otherwise
+    it will load the data from var/local/data/XXXXXX_Data.csv.
+    
+    :param src: Base path of data file to load.  Note that this should not include extensions for compressed or pickled data
+    :type src: string
+
+    Returns:
+        Pandas DataFrame of series framed for supervised learning.
+        
+    """
+
+    _src = src + '.xz' if os.path.isfile(src + '.xz') else src
+
+    # ensure that the pickle file exists and it is newer than the original source.  The 2nd condition should almost always be true
+    if os.path.isfile(src + '.pkl') and os.path.getmtime(src + '.pkl') > os.path.getmtime(_src):
+        data_raw = pd.read_pickle(src + '.pkl')
+
+    else:
+        #data_raw = pd.read_csv(src, names = ['date', 'bid', 'ask'], parse_dates=['date'], index_col=['date'], infer_datetime_format=True, memory_map=True)
+        data_raw = pd.read_csv(src + '.xz' if os.path.isfile(src + '.xz') else src, names = ['date', 'bid', 'ask'], memory_map=True)
+        #data_raw['date'] = pd.to_datetime(data_raw['date'], format="%Y %m %d %H %M %S %f")
+        data_raw["date"] = pd.to_datetime(data_raw["date"], format=date_format_string)
+        data_raw.set_index("date", inplace=True)
+        #data_raw = data_raw.set_index("date")
+        data_raw.to_pickle(src + '.pkl')
+    
+    return data_raw
