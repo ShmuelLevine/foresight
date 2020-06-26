@@ -165,8 +165,20 @@ class Data_Transformer():
                          err_msg='must be None or integers',
                          allow_none=True)
 
-    def Invert(self, data):
-        return self.scaler.inverse_transform(data.reshape(-1,1))
+    def Invert_Scaling(self, data):
+        return self.scaler.inverse_transform(data.reshape(-1,1)) if self.scaler is not None else data
+    
+    def Invert_Transform(self, new_data, orig_data):
+        if self.scaler:
+            tmp_data = self.scaler.inverse_transform(data.reshape(-1,1))
+        else:
+            tmp_data = new_data
+        
+        if self.transform == 'Diff':
+            return new_data + orig_data
+        
+        
+        
     
     def __call__(self, data, remove_outliers = None):
 
@@ -195,6 +207,9 @@ class Data_Transformer():
                                                     np.std(data_))] = np.nan
         data_ = pd.Series(data_).fillna(method='bfill').to_numpy()
 
+        if self.scaler is None:
+            return data_, None
+        
         if hasattr(self.scaler, 'fit_transform'):
             scaler_ = self.scaler
         
@@ -236,8 +251,9 @@ def GetTickdataDataframe(src, date_format_string = '%Y-%m-%d %H:%M:%S.%f'):
     _src = src + '.xz' if os.path.isfile(src + '.xz') else src
 
     # ensure that the pickle file exists and it is newer than the original source.  The 2nd condition should almost always be true
-    if os.path.isfile(src + '.pkl') and os.path.getmtime(src + '.pkl') > os.path.getmtime(_src):
-        data_raw = pd.read_pickle(src + '.pkl')
+    if (os.path.isfile(src + '.pkl') or os.path.isfile(src + '.pkl.xz')): # and os.path.getmtime(src + '.pkl') > os.path.getmtime(_src):
+        ext = '.pkl.xz' if os.path.isfile(src + '.pkl.xz') else '.pkl'
+        data_raw = pd.read_pickle(src + ext)
 
     else:
         #data_raw = pd.read_csv(src, names = ['date', 'bid', 'ask'], parse_dates=['date'], index_col=['date'], infer_datetime_format=True, memory_map=True)
@@ -246,6 +262,6 @@ def GetTickdataDataframe(src, date_format_string = '%Y-%m-%d %H:%M:%S.%f'):
         data_raw["date"] = pd.to_datetime(data_raw["date"], format=date_format_string)
         data_raw.set_index("date", inplace=True)
         #data_raw = data_raw.set_index("date")
-        data_raw.to_pickle(src + '.pkl')
+        data_raw.to_pickle(src + '.pkl.xz')
     
     return data_raw
